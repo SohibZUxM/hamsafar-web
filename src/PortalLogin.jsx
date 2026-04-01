@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import "./PortalLogin.css";
 
-import { auth, db } from "./firebase";
+import { auth, db, firebaseConfigError } from "./firebase";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -63,6 +63,24 @@ export default function PortalLogin() {
 
   const isLogin = mode === "login";
   const urlRole = role; // role from URL (portal)
+
+  if (firebaseConfigError) {
+    return (
+      <div className="portal-login-page">
+        <div className="portal-login-card">
+          <div className="portal-role-pill">{roleLabel}</div>
+          <h1 className="portal-welcome-title">Portal setup incomplete</h1>
+          <p className="portal-welcome-subtitle">
+            The login page could not start because Firebase is not configured correctly.
+          </p>
+          <p className="portal-error-text">{firebaseConfigError}</p>
+          <p className="portal-bottom-text">
+            Add the missing `VITE_FIREBASE_*` values, then fully restart the Vite server.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const goToDashboard = (targetRole) => {
     if (targetRole === "student") navigate("/student");

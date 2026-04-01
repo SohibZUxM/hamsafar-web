@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import React, { Suspense, lazy } from "react";
 import "./App.css";
 import {
   BrowserRouter as Router,
@@ -6,8 +6,8 @@ import {
   Route,
   useNavigate,
 } from "react-router-dom";
-import PortalLogin from "./PortalLogin";
 
+const PortalLogin = lazy(() => import("./PortalLogin"));
 const StudentPage = lazy(() => import("./StudentPage"));
 const TeacherPage = lazy(() => import("./TeacherPage"));
 const ParentPage = lazy(() => import("./ParentPage"));
@@ -35,77 +35,6 @@ function RouteLoading() {
 
 function Home() {
   const navigate = useNavigate();
-  const [installPrompt, setInstallPrompt] = useState(null);
-  const [isInstalled, setIsInstalled] = useState(false);
-
-  useEffect(() => {
-    const standaloneMatch = window.matchMedia("(display-mode: standalone)");
-
-    const updateInstalledState = () => {
-      setIsInstalled(
-        standaloneMatch.matches || window.navigator.standalone === true
-      );
-    };
-
-    const handleBeforeInstallPrompt = (event) => {
-      event.preventDefault();
-      setInstallPrompt(event);
-    };
-
-    const handleAppInstalled = () => {
-      setIsInstalled(true);
-      setInstallPrompt(null);
-    };
-
-    updateInstalledState();
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleAppInstalled);
-    standaloneMatch.addEventListener("change", updateInstalledState);
-
-    return () => {
-      window.removeEventListener(
-        "beforeinstallprompt",
-        handleBeforeInstallPrompt
-      );
-      window.removeEventListener("appinstalled", handleAppInstalled);
-      standaloneMatch.removeEventListener("change", updateInstalledState);
-    };
-  }, []);
-
-  const installButtonLabel = useMemo(() => {
-    if (isInstalled) {
-      return "App Installed";
-    }
-
-    return "Install App";
-  }, [isInstalled]);
-
-  const handleInstallClick = async () => {
-    if (isInstalled) {
-      return;
-    }
-
-    if (installPrompt) {
-      installPrompt.prompt();
-      await installPrompt.userChoice;
-      setInstallPrompt(null);
-
-      return;
-    }
-
-    const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-
-    if (isIos) {
-      window.alert(
-        "To install Hamsafar on iPhone, tap Share in Safari and choose 'Add to Home Screen'."
-      );
-      return;
-    }
-
-    window.alert(
-      "To install Hamsafar, open your browser menu and choose 'Install app' or 'Add to Home screen'."
-    );
-  };
 
   return (
     <div className="page">
@@ -143,13 +72,6 @@ function Home() {
 
           <div className="nav-actions">
             <button
-              className="btn nav-install"
-              onClick={handleInstallClick}
-              disabled={isInstalled}
-            >
-              {installButtonLabel}
-            </button>
-            <button
               className="btn btn-primary nav-cta"
               onClick={() => {
                 const el = document.getElementById("access-portal");
@@ -177,13 +99,6 @@ function Home() {
                 educational journey.
               </p>
               <div className="hero-actions">
-                <button
-                  className="btn btn-outline"
-                  onClick={handleInstallClick}
-                  disabled={isInstalled}
-                >
-                  {installButtonLabel}
-                </button>
                 <button className="btn btn-accent">Explore Programs</button>
                 <button className="btn btn-outline">Learn More</button>
               </div>

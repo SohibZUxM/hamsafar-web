@@ -27,6 +27,7 @@ export default function AdminPage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [parentLinkTarget, setParentLinkTarget] = useState("");
+  const [editingUser, setEditingUser] = useState(null);
 
   // ========== PROFILE ==========
   const [adminProfile, setAdminProfile] = useState({
@@ -98,7 +99,10 @@ export default function AdminPage() {
   );
 
   // ========== HELPERS ==========
-  const closeModal = () => setModal(null);
+  const closeModal = () => {
+    setModal(null);
+    setEditingUser(null);
+  };
 
   const getCourseName = useCallback(
     (courseId) => courses.find((c) => c.id === courseId)?.name || "—",
@@ -409,6 +413,44 @@ export default function AdminPage() {
       "dot-orange",
       `Unlinked "${getUserLabel(activeStudents, studentUid)}" from parent "${getUserLabel(activeParents, parentUid)}"`
     );
+  };
+
+  const openEditUserModal = (user, roleLabel) => {
+    setEditingUser({
+      id: user.id,
+      roleLabel,
+      fullName: user.fullName || "",
+      email: user.email || "",
+    });
+    setModal("editUser");
+  };
+
+  const handleEditUser = async (e) => {
+    e.preventDefault();
+    if (!editingUser?.id) return;
+
+    const fd = new FormData(e.currentTarget);
+    const fullName = String(fd.get("fullName") || "").trim();
+    const email = String(fd.get("email") || "").trim().toLowerCase();
+
+    if (!fullName || !email) {
+      alert("Please enter both full name and email.");
+      return;
+    }
+
+    await updateDoc(doc(db, "users", editingUser.id), {
+      fullName,
+      email,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || null,
+    });
+
+    await writeActivity(
+      "dot-blue",
+      `Updated ${editingUser.roleLabel} "${fullName}"`
+    );
+
+    closeModal();
   };
 
   const handleRemoveStudentFromClass = async (studentUid, classId) => {
@@ -988,6 +1030,13 @@ export default function AdminPage() {
                           <button
                             type="button"
                             className="ap-modal-btn ghost"
+                            onClick={() => openEditUserModal(t, "teacher")}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="ap-modal-btn ghost"
                             onClick={() => disableTeacher(t.id)}
                           >
                             Disable
@@ -1055,6 +1104,13 @@ export default function AdminPage() {
                         </div>
 
                         <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            className="ap-modal-btn ghost"
+                            onClick={() => openEditUserModal(s, "student")}
+                          >
+                            Edit
+                          </button>
                           <button
                             type="button"
                             className="ap-modal-btn ghost"
@@ -1174,6 +1230,13 @@ export default function AdminPage() {
                           <button
                             type="button"
                             className="ap-modal-btn ghost"
+                            onClick={() => openEditUserModal(p, "parent")}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="ap-modal-btn ghost"
                             onClick={() => {
                               setParentLinkTarget(p.id);
                               setModal("linkParentChild");
@@ -1209,6 +1272,7 @@ export default function AdminPage() {
                   {modal === "enroll" && "Enroll Student"}
                   {modal === "assignTeacher" && "Assign Teacher"}
                   {modal === "linkParentChild" && "Link Parent to Student"}
+                  {modal === "editUser" && `Edit ${editingUser?.roleLabel || "User"}`}
                 </div>
                 <button className="ap-modal-x" onClick={closeModal} aria-label="Close" type="button">
                   <X size={18} />
@@ -1344,6 +1408,32 @@ export default function AdminPage() {
                   <div className="ap-modal-actions">
                     <button type="button" className="ap-modal-btn ghost" onClick={closeModal}>Cancel</button>
                     <button className="ap-modal-btn" type="submit">Link</button>
+                  </div>
+                </form>
+              )}
+
+              {modal === "editUser" && editingUser && (
+                <form className="ap-modal-form" onSubmit={handleEditUser}>
+                  <label>Full Name</label>
+                  <input
+                    name="fullName"
+                    required
+                    defaultValue={editingUser.fullName}
+                    placeholder="Enter full name"
+                  />
+
+                  <label>Email</label>
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    defaultValue={editingUser.email}
+                    placeholder="Enter email address"
+                  />
+
+                  <div className="ap-modal-actions">
+                    <button type="button" className="ap-modal-btn ghost" onClick={closeModal}>Cancel</button>
+                    <button className="ap-modal-btn" type="submit">Save</button>
                   </div>
                 </form>
               )}
