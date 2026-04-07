@@ -19,7 +19,7 @@ const requiredEnvVars = [
 
 const missingEnvVars = requiredEnvVars.filter((key) => !readFirebaseEnv(key));
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: readFirebaseEnv("API_KEY"),
   authDomain: readFirebaseEnv("AUTH_DOMAIN"),
   projectId: readFirebaseEnv("PROJECT_ID"),

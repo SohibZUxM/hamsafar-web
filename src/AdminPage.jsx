@@ -1,15 +1,16 @@
 // src/AdminPage.jsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AdminPage.css";
+import { deleteApp, initializeApp } from "firebase/app";
 
 import {
   Bell,Settings,LayoutDashboard,BookOpen,ClipboardList,GraduationCap,Users,
   UserRound,UserRoundCog,School,Plus,Monitor,X,LogOut,
 } from "lucide-react";
 
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { db, auth } from "./firebase";
+import { createUserWithEmailAndPassword, getAuth as getFirebaseAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import { db, auth, firebaseConfig } from "./firebase";
 
 import {
   collection,doc,updateDoc,addDoc,setDoc,getDoc,getDocs,deleteDoc,
@@ -28,6 +29,11 @@ export default function AdminPage() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [parentLinkTarget, setParentLinkTarget] = useState("");
   const [editingUser, setEditingUser] = useState(null);
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [editingClass, setEditingClass] = useState(null);
+  const [addUserRole, setAddUserRole] = useState("");
+  const notificationsRef = useRef(null);
+  const profileMenuRef = useRef(null);
 
   // ========== PROFILE ==========
   const [adminProfile, setAdminProfile] = useState({
@@ -102,6 +108,9 @@ export default function AdminPage() {
   const closeModal = () => {
     setModal(null);
     setEditingUser(null);
+    setEditingCourse(null);
+    setEditingClass(null);
+    setAddUserRole("");
   };
 
   const getCourseName = useCallback(
@@ -189,6 +198,32 @@ export default function AdminPage() {
     return () => unsub();
   }, [navigate]);
 
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (
+        showNotifications &&
+        notificationsRef.current &&
+        !notificationsRef.current.contains(event.target)
+      ) {
+        setShowNotifications(false);
+      }
+
+      if (
+        showProfileMenu &&
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target)
+      ) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [showNotifications, showProfileMenu]);
+
   // ========== ACTIONS (TOP STATS + QUICK) ==========
   const stats = useMemo(
     () => [
@@ -263,6 +298,13 @@ export default function AdminPage() {
     await writeActivity("dot-green", `Approved user as ${newRole}`);
   };
 
+  const rejectPendingUser = async (uid, label) => {
+    if (!window.confirm(`Reject this request from ${label || "this user"}?`)) return;
+
+    await deleteDoc(doc(db, "users", uid));
+    await writeActivity("dot-orange", `Rejected pending request from ${label || "user"}`);
+  };
+
   const handleAddCourse = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -285,6 +327,43 @@ export default function AdminPage() {
     });
 
     await writeActivity("dot-blue", `Course "${name}" created successfully`);
+    closeModal();
+  };
+
+  const openEditCourseModal = (course) => {
+    setEditingCourse({
+      id: course.id,
+      name: course.name || "",
+      code: course.code || "",
+    });
+    setModal("course");
+  };
+
+  const handleEditCourse = async (e) => {
+    e.preventDefault();
+    if (!editingCourse?.id) return;
+
+    const fd = new FormData(e.currentTarget);
+    const name = String(fd.get("name") || "").trim();
+    const code = String(fd.get("code") || "").trim();
+    if (!name || !code) return;
+
+    const dupQ = query(collection(db, "courses"), where("code", "==", code), limit(10));
+    const dupSnap = await getDocs(dupQ);
+    const hasDuplicate = dupSnap.docs.some((courseDoc) => courseDoc.id !== editingCourse.id);
+    if (hasDuplicate) {
+      alert(`Course code "${code}" already exists.`);
+      return;
+    }
+
+    await updateDoc(doc(db, "courses", editingCourse.id), {
+      name,
+      code,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || null,
+    });
+
+    await writeActivity("dot-blue", `Updated course "${name}"`);
     closeModal();
   };
 
@@ -326,6 +405,59 @@ export default function AdminPage() {
     });
 
     await writeActivity("dot-green", `New class "${name}" added under ${getCourseName(courseId)}`);
+    closeModal();
+  };
+
+  const openEditClassModal = (cls) => {
+    setEditingClass({
+      id: cls.id,
+      name: cls.name || "",
+      code: cls.code || "",
+      courseId: cls.courseId || "",
+    });
+    setModal("class");
+  };
+
+  const handleEditClass = async (e) => {
+    e.preventDefault();
+    if (!editingClass?.id) return;
+
+    const fd = new FormData(e.currentTarget);
+    const name = String(fd.get("name") || "").trim();
+    const code = String(fd.get("code") || "").trim().toUpperCase();
+    const courseId = String(fd.get("courseId") || "");
+    if (!name || !code || !courseId) return;
+
+    const dupQ = query(
+      collection(db, "classes"),
+      where("courseId", "==", courseId),
+      where("name", "==", name),
+      limit(10)
+    );
+    const dupSnap = await getDocs(dupQ);
+    const hasNameDuplicate = dupSnap.docs.some((classDoc) => classDoc.id !== editingClass.id);
+    if (hasNameDuplicate) {
+      alert(`Class "${name}" already exists under this course.`);
+      return;
+    }
+
+    const dupCodeQ = query(collection(db, "classes"), where("code", "==", code), limit(10));
+    const dupCodeSnap = await getDocs(dupCodeQ);
+    const hasCodeDuplicate = dupCodeSnap.docs.some((classDoc) => classDoc.id !== editingClass.id);
+    if (hasCodeDuplicate) {
+      alert(`Class code "${code}" already exists.`);
+      return;
+    }
+
+    await updateDoc(doc(db, "classes", editingClass.id), {
+      name,
+      code,
+      courseId,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || null,
+    });
+
+    await writeActivity("dot-green", `Updated class "${name}" under ${getCourseName(courseId)}`);
     closeModal();
   };
 
@@ -451,6 +583,67 @@ export default function AdminPage() {
     );
 
     closeModal();
+  };
+
+  const openAddUserModal = (role) => {
+    setAddUserRole(role);
+    setModal("addPortalUser");
+  };
+
+  const handleAddPortalUser = async (e) => {
+    e.preventDefault();
+    if (!addUserRole) return;
+
+    const fd = new FormData(e.currentTarget);
+    const fullName = String(fd.get("fullName") || "").trim();
+    const email = String(fd.get("email") || "").trim().toLowerCase();
+    const password = String(fd.get("password") || "");
+
+    if (!fullName || !email || !password) {
+      alert("Please fill in full name, email, and password.");
+      return;
+    }
+
+    const appName = `admin-create-${Date.now()}`;
+    const secondaryApp = initializeApp(firebaseConfig, appName);
+    const secondaryAuth = getFirebaseAuth(secondaryApp);
+
+    try {
+      const userCred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+
+      await setDoc(doc(db, "users", userCred.user.uid), {
+        email,
+        fullName,
+        requestedRole: addUserRole,
+        role: addUserRole,
+        status: "active",
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser?.uid || null,
+        approvedAt: serverTimestamp(),
+        approvedBy: auth.currentUser?.uid || null,
+      });
+
+      await writeActivity(
+        addUserRole === "teacher" ? "dot-purple" : "dot-orange",
+        `Added ${addUserRole} "${fullName}"`
+      );
+
+      closeModal();
+    } catch (error) {
+      console.error(`Failed to add ${addUserRole}:`, error);
+      if (error?.code === "auth/email-already-in-use") {
+        alert("An account with this email already exists.");
+      } else if (error?.code === "auth/weak-password") {
+        alert("Password is too weak. Use at least 6 characters.");
+      } else if (error?.code === "auth/invalid-email") {
+        alert("Please enter a valid email address.");
+      } else {
+        alert(`Could not add ${addUserRole}. ${error?.message || ""}`.trim());
+      }
+    } finally {
+      await signOut(secondaryAuth).catch(() => {});
+      await deleteApp(secondaryApp);
+    }
   };
 
   const handleRemoveStudentFromClass = async (studentUid, classId) => {
@@ -609,6 +802,11 @@ export default function AdminPage() {
             </div>
           </div>
 
+          <button type="button" className="ap-nav-item ap-sidebar-action" style={{ marginTop: 14 }}>
+            <Settings size={18} />
+            <span>Settings</span>
+          </button>
+
           <button type="button" className="ap-nav-item" onClick={handleAdminLogout} style={{ marginTop: 14 }}>
             <LogOut size={18} />
             <span>Logout</span>
@@ -633,7 +831,7 @@ export default function AdminPage() {
 
           <div className="ap-topbar-right">
             {/* Notifications */}
-            <div style={{ position: "relative", marginRight: 8 }}>
+            <div ref={notificationsRef} style={{ position: "relative", marginRight: 8 }}>
               <button
                 className="ap-icon-btn"
                 aria-label="Notifications"
@@ -666,31 +864,17 @@ export default function AdminPage() {
             </div>
 
             {/* Profile */}
-            <div style={{ position: "relative", marginRight: 8 }}>
+            <div ref={profileMenuRef} className="ap-topbar-profile-wrap">
               <button
                 type="button"
-                className="ap-icon-btn"
+                className="ap-icon-btn ap-profile-btn"
                 aria-label="Profile"
                 onClick={() => setShowProfileMenu((p) => !p)}
-                style={{ display: "flex", alignItems: "center", gap: 8, paddingInline: 10 }}
               >
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "999px",
-                    background: "#1d4ed8",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                    fontSize: 14,
-                    fontWeight: 600,
-                  }}
-                >
+                <div className="ap-profile-avatar">
                   {adminProfile.fullName?.[0] || "A"}
                 </div>
-                <span style={{ fontSize: 13 }}>{adminProfile.fullName}</span>
+                <span className="ap-profile-name">{adminProfile.fullName}</span>
               </button>
               {showProfileMenu && (
                 <div
@@ -726,10 +910,6 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
-
-            <button className="ap-icon-btn" aria-label="Settings" type="button">
-              <Settings size={18} />
-            </button>
           </div>
         </header>
 
@@ -811,6 +991,13 @@ export default function AdminPage() {
                           <button className="ap-modal-btn" type="button" onClick={() => approveUser(u.id, "student")}>Approve Student</button>
                           <button className="ap-modal-btn" type="button" onClick={() => approveUser(u.id, "teacher")}>Approve Teacher</button>
                           <button className="ap-modal-btn" type="button" onClick={() => approveUser(u.id, "parent")}>Approve Parent</button>
+                          <button
+                            className="ap-modal-btn ap-danger-btn"
+                            type="button"
+                            onClick={() => rejectPendingUser(u.id, u.fullName || u.email)}
+                          >
+                            Reject
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -842,7 +1029,16 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      <button type="button" className="ap-modal-btn ghost" onClick={() => deleteCourse(c.id)}>Delete</button>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          className="ap-modal-btn ghost"
+                          onClick={() => openEditCourseModal(c)}
+                        >
+                          Edit
+                        </button>
+                        <button type="button" className="ap-modal-btn ghost" onClick={() => deleteCourse(c.id)}>Delete</button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -899,7 +1095,16 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          <button type="button" className="ap-modal-btn ghost" onClick={() => deleteClass(cl.id)}>Delete</button>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              type="button"
+                              className="ap-modal-btn ghost"
+                              onClick={() => openEditClassModal(cl)}
+                            >
+                              Edit
+                            </button>
+                            <button type="button" className="ap-modal-btn ghost" onClick={() => deleteClass(cl.id)}>Delete</button>
+                          </div>
                         </div>
                       );
                     })}
@@ -970,6 +1175,14 @@ export default function AdminPage() {
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
               >
                 <span>Teachers</span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button className="ap-modal-btn" type="button" onClick={() => setModal("assignTeacher")}>
+                    Assign Teacher
+                  </button>
+                  <button className="ap-modal-btn" type="button" onClick={() => openAddUserModal("teacher")}>
+                    + Add Teacher
+                  </button>
+                </div>
               </div>
 
               {activeTeachers.length === 0 ? (
@@ -1058,9 +1271,14 @@ export default function AdminPage() {
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
               >
                 <span>Students</span>
-                <button className="ap-modal-btn" type="button" onClick={() => setModal("enroll")}>
-                  + Enroll Student
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button className="ap-modal-btn" type="button" onClick={() => setModal("enroll")}>
+                    Enroll Student
+                  </button>
+                  <button className="ap-modal-btn" type="button" onClick={() => openAddUserModal("student")}>
+                    + Add Student
+                  </button>
+                </div>
               </div>
 
               {activeStudents.length === 0 ? (
@@ -1267,12 +1485,14 @@ export default function AdminPage() {
             <div className="ap-modal" onMouseDown={(e) => e.stopPropagation()}>
               <div className="ap-modal-head">
                 <div className="ap-modal-title">
-                  {modal === "course" && "Add Course"}
-                  {modal === "class" && "Add Class"}
+                  {modal === "course" && (editingCourse ? "Edit Course" : "Add Course")}
+                  {modal === "class" && (editingClass ? "Edit Class" : "Add Class")}
                   {modal === "enroll" && "Enroll Student"}
                   {modal === "assignTeacher" && "Assign Teacher"}
                   {modal === "linkParentChild" && "Link Parent to Student"}
                   {modal === "editUser" && `Edit ${editingUser?.roleLabel || "User"}`}
+                  {modal === "addPortalUser" &&
+                    `Add ${addUserRole ? addUserRole.charAt(0).toUpperCase() + addUserRole.slice(1) : "User"}`}
                 </div>
                 <button className="ap-modal-x" onClick={closeModal} aria-label="Close" type="button">
                   <X size={18} />
@@ -1280,26 +1500,46 @@ export default function AdminPage() {
               </div>
 
               {modal === "course" && (
-                <form className="ap-modal-form" onSubmit={handleAddCourse}>
+                <form className="ap-modal-form" onSubmit={editingCourse ? handleEditCourse : handleAddCourse}>
                   <label>Course Name</label>
-                  <input name="name" required placeholder="e.g., Mathematics" />
+                  <input
+                    name="name"
+                    required
+                    placeholder="e.g., Mathematics"
+                    defaultValue={editingCourse?.name || ""}
+                  />
                   <label>Course Code</label>
-                  <input name="code" required placeholder="e.g., MATH101" />
+                  <input
+                    name="code"
+                    required
+                    placeholder="e.g., MATH101"
+                    defaultValue={editingCourse?.code || ""}
+                  />
                   <div className="ap-modal-actions">
                     <button type="button" className="ap-modal-btn ghost" onClick={closeModal}>Cancel</button>
-                    <button className="ap-modal-btn" type="submit">Create</button>
+                    <button className="ap-modal-btn" type="submit">{editingCourse ? "Save" : "Create"}</button>
                   </div>
                 </form>
               )}
 
               {modal === "class" && (
-                <form className="ap-modal-form" onSubmit={handleAddClass}>
+                <form className="ap-modal-form" onSubmit={editingClass ? handleEditClass : handleAddClass}>
                   <label>Class Name</label>
-                  <input name="name" required placeholder="e.g., Grade 10 - A" />
+                  <input
+                    name="name"
+                    required
+                    placeholder="e.g., Grade 10 - A"
+                    defaultValue={editingClass?.name || ""}
+                  />
                   <label>Class Code</label>
-                  <input name="code" required placeholder="e.g., G10A" />
+                  <input
+                    name="code"
+                    required
+                    placeholder="e.g., G10A"
+                    defaultValue={editingClass?.code || ""}
+                  />
                   <label>Course</label>
-                  <select name="courseId" required>
+                  <select name="courseId" required defaultValue={editingClass?.courseId || ""}>
                     <option value="">Select course...</option>
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -1309,7 +1549,7 @@ export default function AdminPage() {
                   </select>
                   <div className="ap-modal-actions">
                     <button type="button" className="ap-modal-btn ghost" onClick={closeModal}>Cancel</button>
-                    <button className="ap-modal-btn" type="submit">Create</button>
+                    <button className="ap-modal-btn" type="submit">{editingClass ? "Save" : "Create"}</button>
                   </div>
                 </form>
               )}
@@ -1434,6 +1674,41 @@ export default function AdminPage() {
                   <div className="ap-modal-actions">
                     <button type="button" className="ap-modal-btn ghost" onClick={closeModal}>Cancel</button>
                     <button className="ap-modal-btn" type="submit">Save</button>
+                  </div>
+                </form>
+              )}
+
+              {modal === "addPortalUser" && addUserRole && (
+                <form className="ap-modal-form" onSubmit={handleAddPortalUser}>
+                  <label>Full Name</label>
+                  <input
+                    name="fullName"
+                    required
+                    placeholder={`Enter ${addUserRole} full name`}
+                  />
+
+                  <label>Email</label>
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    placeholder={`Enter ${addUserRole} email`}
+                  />
+
+                  <label>Password</label>
+                  <input
+                    name="password"
+                    type="password"
+                    required
+                    minLength={6}
+                    placeholder="Create a temporary password"
+                  />
+
+                  <div className="ap-modal-actions">
+                    <button type="button" className="ap-modal-btn ghost" onClick={closeModal}>Cancel</button>
+                    <button className="ap-modal-btn" type="submit">
+                      Add {addUserRole.charAt(0).toUpperCase() + addUserRole.slice(1)}
+                    </button>
                   </div>
                 </form>
               )}

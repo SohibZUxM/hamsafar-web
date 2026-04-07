@@ -126,6 +126,10 @@
   margin-top: 2px;
 }
 
+.ap-sidebar-action{
+  margin-bottom: 0;
+}
+
 /* ============ MAIN ============ */
 .ap-main{
   margin-left: 270px;
@@ -159,6 +163,7 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  min-width: 0;
 }
 
 .ap-icon-btn{
@@ -175,6 +180,44 @@
 
 .ap-icon-btn:hover{
   background: #f6f8fc;
+}
+
+.ap-topbar-profile-wrap{
+  position: relative;
+  margin-right: 8px;
+  min-width: 0;
+}
+
+.ap-profile-btn{
+  width: auto;
+  max-width: min(100%, 260px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 10px 12px;
+}
+
+.ap-profile-avatar{
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #1d4ed8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.ap-profile-name{
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
 }
 
 /* Content wrapper */
@@ -453,6 +496,16 @@
   background: #f1f5f9;
   color: #0f172a;
 }
+
+.ap-modal-btn.ap-danger-btn{
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.ap-modal-btn.ap-danger-btn:hover{
+  background: #fecaca;
+}
 .ap-modal-btn:hover{ filter: brightness(0.97); }
 
 .ap-mobile-nav{
@@ -498,6 +551,15 @@
     width: 100%;
     justify-content: space-between;
     flex-wrap: wrap;
+  }
+
+  .ap-topbar-profile-wrap{
+    flex: 1 1 220px;
+    margin-right: 0;
+  }
+
+  .ap-profile-btn{
+    max-width: 100%;
   }
 
   .ap-content{
