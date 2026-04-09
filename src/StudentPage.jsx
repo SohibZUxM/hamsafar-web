@@ -25,6 +25,11 @@ const safeDateLabel = (value) => {
     : date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 };
 
+const getInitialLetter = (value, fallback = "?") => {
+  const clean = String(value || "").trim();
+  return clean ? clean.charAt(0).toUpperCase() : fallback;
+};
+
 export default function StudentPage() {
   const navigate = useNavigate();
 
@@ -290,8 +295,11 @@ export default function StudentPage() {
           {/* Header Left */}
           <div className="sp-header-left">
             <div className="sp-logo">
-              <div className="sp-logo-icon">🎓</div>
-              <span>Hamsafar</span>
+              <img
+                src="/HMS_Logo - Cropped.jpg"
+                alt="XAMSAFAR logo"
+                className="sp-logo-image"
+              />
             </div>
 
             <div className="sp-search">
@@ -342,7 +350,7 @@ export default function StudentPage() {
                 className="sp-profile"
                 onClick={() => setShowProfileMenu((p) => !p)}
               >
-                <div className="sp-avatar" />
+                <div className="sp-avatar">{getInitialLetter(profile.fullName, "S")}</div>
                 <div className="sp-profile-info">
                   <div className="sp-profile-name">{profile.fullName}</div>
                   <div className="sp-profile-sub">{profile.email}</div>

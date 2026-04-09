@@ -43,6 +43,11 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 
+const getInitialLetter = (value, fallback = "?") => {
+  const clean = String(value || "").trim();
+  return clean ? clean.charAt(0).toUpperCase() : fallback;
+};
+
 /* ===================== ResourceModal ===================== */
 function ResourceModal({
   myClasses,
@@ -1186,8 +1191,11 @@ export default function TeacherPage() {
       {/* ============ SIDEBAR ============ */}
       <aside className="tp-sidebar">
         <div className="tp-logo">
-          <div className="tp-logo-icon">🎓</div>
-          <span className="tp-logo-text">Hamsafar</span>
+          <img
+            src="/HMS_Logo - Cropped.jpg"
+            alt="XAMSAFAR logo"
+            className="tp-logo-image"
+          />
         </div>
 
         <div className="tp-sidebar-main">
@@ -1369,11 +1377,9 @@ export default function TeacherPage() {
                 onClick={() => setShowProfileMenu((p) => !p)}
                 style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}
               >
-                <img
-                  src="https://i.pravatar.cc/60?img=47"
-                  alt={teacherProfile.fullName}
-                  className="tp-topbar-avatar"
-                />
+                <div className="tp-topbar-avatar" aria-hidden="true">
+                  {getInitialLetter(teacherProfile.fullName, "T")}
+                </div>
                 <div style={{ textAlign: "left" }}>
                   <div className="tp-topbar-name">{teacherProfile.fullName}</div>
                   <div className="tp-topbar-role">Teacher</div>

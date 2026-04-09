@@ -6,7 +6,7 @@ import { deleteApp, initializeApp } from "firebase/app";
 
 import {
   Bell,Settings,LayoutDashboard,BookOpen,ClipboardList,GraduationCap,Users,
-  UserRound,UserRoundCog,School,Plus,Monitor,X,LogOut,
+  UserRound,UserRoundCog,Plus,Monitor,X,LogOut,
 } from "lucide-react";
 
 import { createUserWithEmailAndPassword, getAuth as getFirebaseAuth, onAuthStateChanged, signOut } from "firebase/auth";
@@ -19,7 +19,7 @@ import {
 import useRealtimeList from "./useRealtimeList";
 
 export default function AdminPage() {
-  const adminDisplayName = "Hamsafar Admin";
+  const adminDisplayName = "XAMSAFAR Admin";
   const navigate = useNavigate();
 
   // ========== UI STATE ==========
@@ -748,13 +748,11 @@ export default function AdminPage() {
       {/* SIDEBAR */}
       <aside className="ap-sidebar">
         <div className="ap-brand">
-          <div className="ap-brand-icon">
-            <School size={18} />
-          </div>
-          <div className="ap-brand-text">
-            <div className="ap-brand-title">EduAdmin</div>
-            <div className="ap-brand-subtitle">Management Portal</div>
-          </div>
+          <img
+            src="/HMS_Logo - Cropped.jpg"
+            alt="XAMSAFAR logo"
+            className="ap-brand-image"
+          />
         </div>
 
         <nav className="ap-nav">
@@ -873,7 +871,7 @@ export default function AdminPage() {
                 onClick={() => setShowProfileMenu((p) => !p)}
               >
                 <div className="ap-profile-avatar">
-                  {adminDisplayName[0] || "A"}
+                  {(adminProfile.fullName || adminDisplayName || "A").trim().charAt(0).toUpperCase()}
                 </div>
                 <span className="ap-profile-name">{adminDisplayName}</span>
               </button>

@@ -1,6 +1,6 @@
 {
-  "name": "Hamsafar",
-  "short_name": "Hamsafar",
+  "name": "XAMSAFAR",
+  "short_name": "XAMSAFAR",
   "description": "Learning management platform for students, teachers, parents, and admins.",
   "start_url": "/",
   "scope": "/",
@@ -10,15 +10,15 @@
   "theme_color": "#2563eb",
   "icons": [
     {
-      "src": "/pwa-icon-192.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
+      "src": "/HMS_Logo.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "/pwa-icon-512.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
+      "src": "/HMS_Logo.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
       "purpose": "any"
     }
   ]

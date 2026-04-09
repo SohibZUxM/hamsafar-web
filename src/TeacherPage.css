@@ -54,14 +54,11 @@ body,
   margin-bottom: 24px;
 }
 
-.tp-logo-icon {
-  font-size: 30px;
-}
-
-.tp-logo-text {
-  font-size: 22px;
-  font-weight: 700;
-  color: #111827;
+.tp-logo-image {
+  width: auto;
+  height: 58px;
+  display: block;
+  object-fit: contain;
 }
 
 /* nav blocks */
@@ -175,24 +172,40 @@ body,
 .tp-topbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
 }
 
 .tp-topbar-avatar {
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  height: 52px;
   border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #4f46e5, #8b5cf6);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .tp-topbar-name {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #111827;
 }
 
 .tp-topbar-role {
-  font-size: 12px;
+  font-size: 13px;
   color: #6b7280;
+}
+
+.tp-topbar-profile-btn {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 8px 12px;
+  cursor: pointer;
 }
 
 /* content area under header */
@@ -1061,6 +1074,15 @@ body,
     width: 100%;
     justify-content: space-between;
     flex-wrap: wrap;
+  }
+
+  .tp-logo-image {
+    height: 50px;
+  }
+
+  .tp-topbar-avatar {
+    width: 44px;
+    height: 44px;
   }
 
   .tp-mobile-nav {

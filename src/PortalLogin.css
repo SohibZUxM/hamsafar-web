@@ -43,17 +43,10 @@
   margin-bottom: 4px;
 }
 
-.portal-logo-badge {
-  width: 70px;
-  height: 70px;
-  border-radius: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 26px;
-  background: linear-gradient(135deg, #4f46e5, #2563eb);
-  color: #ffffff;
+.portal-logo-image {
+  width: min(100%, 220px);
+  height: auto;
+  display: block;
 }
 
 /* titles */

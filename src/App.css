@@ -152,7 +152,7 @@ body {
 }
 
 .nav {
-  height: 84px;
+  height: 100px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -164,18 +164,11 @@ body {
   gap: 14px;
 }
 
-.brand-icon {
-  width: 54px;
-  height: 54px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.brand-icon-image {
-  width: 100%;
-  height: 100%;
+.brand-logo-image {
+  width: auto;
+  height: 86px;
   display: block;
+  object-fit: contain;
 }
 
 .brand-text {
@@ -711,13 +704,20 @@ body {
   border-bottom: 1px solid rgba(148, 163, 184, 0.35);
 }
 
-.footer-brand-icon {
-  width: 60px;
-  height: 60px;
-  display: flex;
+.footer-brand-shell {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0px;
+  padding: 10px 14px;
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.footer-brand-image {
+  width: auto;
+  height: 72px;
+  display: block;
+  object-fit: contain;
 }
 
 .footer-brand-title {
@@ -833,6 +833,10 @@ body {
     flex-wrap: wrap;
   }
 
+  .brand-logo-image {
+    height: 72px;
+  }
+
   .nav-actions {
     width: 100%;
     flex-direction: column;
@@ -892,6 +896,10 @@ body {
 
   .brand-subtitle {
     font-size: 13px;
+  }
+
+  .brand-logo-image {
+    height: 60px;
   }
 
   .hero-title {

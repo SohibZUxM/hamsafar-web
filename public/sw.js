@@ -1,10 +1,9 @@
-const CACHE_NAME = "hamsafar-app-shell-v1";
+const CACHE_NAME = "xamsafar-app-shell-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/manifest.webmanifest",
-  "/pwa-icon-192.svg",
-  "/pwa-icon-512.svg",
+  "/HMS_Logo.jpg",
 ];
 
 self.addEventListener("install", (event) => {

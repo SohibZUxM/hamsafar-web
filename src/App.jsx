@@ -42,17 +42,11 @@ function Home() {
       <header className="header">
         <div className="container nav">
           <div className="brand">
-            <div className="brand-icon">
-              <img
-                src="/hamsafar-logo.svg"
-                alt="Hamsafar logo"
-                className="brand-icon-image"
-              />
-            </div>
-            <div className="brand-text">
-              <div className="brand-title">Hamsafar</div>
-              <div className="brand-subtitle">Learning Excellence</div>
-            </div>
+            <img
+              src="/HMS_Logo - Cropped.jpg"
+              alt="XAMSAFAR logo"
+              className="brand-logo-image"
+            />
           </div>
 
           <nav className="nav-links">
@@ -206,7 +200,7 @@ function Home() {
         <section className="section section-why">
           <div className="container">
             <div className="section-heading">
-              <h2>Why Choose Hamsafar?</h2>
+              <h2>Why Choose XAMSAFAR?</h2>
               <p>
                 Our comprehensive platform brings together modern technology and
                 educational excellence.
@@ -252,7 +246,7 @@ function Home() {
           <div className="container cta-inner">
             <h2>Ready to Transform Education?</h2>
             <p>
-              Join thousands of students, teachers, and parents who trust Hamsafar for
+              Join thousands of students, teachers, and parents who trust XAMSAFAR for
               their educational journey.
             </p>
             <div className="cta-actions">
@@ -272,18 +266,12 @@ function Home() {
         <div className="container footer-inner">
           <div className="footer-brand">
             <div className="brand">
-              <div className="brand-icon footer-brand-icon">
+              <div className="footer-brand-shell">
                 <img
-                  src="/hamsafar-logo.svg"
-                  alt="Hamsafar logo"
-                  className="brand-icon-image"
+                  src="/HMS_Logo - Cropped.jpg"
+                  alt="XAMSAFAR logo"
+                  className="footer-brand-image"
                 />
-              </div>
-              <div className="brand-text">
-                <div className="brand-title footer-brand-title">Hamsafar</div>
-                <div className="brand-subtitle footer-brand-subtitle">
-                  Learning Excellence
-                </div>
               </div>
             </div>
             <p className="footer-description">
@@ -316,7 +304,7 @@ function Home() {
         </div>
 
         <div className="footer-bottom">
-          © 2026 Hamsafar. All rights reserved.
+          © 2026 XAMSAFAR. All rights reserved.
         </div>
 
         <button className="help-badge">❓ Help</button>

@@ -560,11 +560,11 @@ export default function ParentPage() {
       <aside className="pp-sidebar">
         <div className="pp-sidebar-main">
           <div className="pp-logo">
-            <div className="pp-logo-icon">🎓</div>
-            <div className="pp-logo-text">
-              <span className="pp-logo-title">Hamsafar</span>
-              <span className="pp-logo-sub">Parent Portal</span>
-            </div>
+            <img
+              src="/HMS_Logo - Cropped.jpg"
+              alt="XAMSAFAR logo"
+              className="pp-logo-image"
+            />
           </div>
 
           <nav className="pp-nav">
