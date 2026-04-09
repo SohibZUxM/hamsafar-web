@@ -39,7 +39,7 @@ import useRealtimeWhereIn from "./useRealtimeWhereIn";
 import useRealtimeDocsByIds from "./useRealtimeDocsByIds";
 import {
   ref as storageRef,
-  uploadBytesResumable,
+  uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
 
@@ -71,6 +71,7 @@ function ResourceModal({
   const [fileName, setFileName] = useState(initialValues?.fileName || "");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [formError, setFormError] = useState("");
@@ -85,6 +86,7 @@ function ResourceModal({
     setFileName(initialValues?.fileName || "");
     setUploadProgress(0);
     setUploading(false);
+    setUploadStatus("");
     setSaving(false);
     setUploadError("");
     setFormError("");
@@ -104,68 +106,34 @@ function ResourceModal({
     setFileName("");
     setUploadProgress(0);
     setUploading(true);
+    setUploadStatus("Uploading file...");
 
     try {
+      if (!storage) {
+        throw new Error("Firebase Storage is not configured for this app.");
+      }
+
       const fileRef = storageRef(storage, `resources/${Date.now()}_${file.name}`);
-      const uploadTask = uploadBytesResumable(fileRef, file, {
-        contentType: file.type || "application/pdf",
-      });
-
-      const snap = await new Promise((resolve, reject) => {
-        let timeoutId = null;
-        let finished = false;
-        let unsubscribe = () => {};
-
-        const cleanup = () => {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-          }
-          unsubscribe();
-        };
-
-        const finish = (handler, value) => {
-          if (finished) return;
-          finished = true;
-          cleanup();
-          handler(value);
-        };
-
-        const resetTimeout = () => {
-          if (timeoutId) clearTimeout(timeoutId);
-          timeoutId = setTimeout(() => {
-            uploadTask.cancel();
-            finish(
-              reject,
+      const uploadSnapshot = await Promise.race([
+        uploadBytes(fileRef, file, {
+          contentType: file.type || "application/pdf",
+        }),
+        new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(
               new Error(
                 "Upload timed out. Check your connection or Firebase Storage configuration and try again."
               )
             );
           }, uploadTimeoutMs);
-        };
+        }),
+      ]);
 
-        resetTimeout();
-
-        unsubscribe = uploadTask.on(
-          "state_changed",
-          (snapshot) => {
-            const percent = snapshot.totalBytes
-              ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
-              : 0;
-            setUploadProgress(percent);
-            resetTimeout();
-          },
-          (err) => {
-            finish(reject, err);
-          },
-          () => {
-            finish(resolve, uploadTask.snapshot);
-          }
-        );
-      });
+      setUploadProgress(100);
+      setUploadStatus("Preparing download link...");
 
       const downloadUrl = await Promise.race([
-        getDownloadURL(snap.ref),
+        getDownloadURL(uploadSnapshot.ref),
         new Promise((_, reject) => {
           setTimeout(() => {
             reject(
@@ -180,6 +148,7 @@ function ResourceModal({
       setFileUrl(downloadUrl);
       setFileName(file.name);
       setUploadProgress(100);
+      setUploadStatus("");
       setUploadError("");
       if (!title.trim()) {
         setTitle(file.name);
@@ -195,6 +164,7 @@ function ResourceModal({
             : `Upload failed: ${err?.message || "unknown error"}. Check Firebase Storage rules.`;
       setUploadError(message);
       setUploadProgress(0);
+      setUploadStatus("");
     } finally {
       setUploading(false);
     }
@@ -339,7 +309,8 @@ function ResourceModal({
           />
           {uploading && (
             <div style={{ fontSize: 12, color: "#2563eb", marginTop: 4 }}>
-              Uploading... {uploadProgress}%
+              {uploadStatus || "Uploading..."}
+              {uploadProgress > 0 ? ` ${uploadProgress}%` : ""}
             </div>
           )}
           {fileUrl && !uploading && (
