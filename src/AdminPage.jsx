@@ -19,6 +19,7 @@ import {
 import useRealtimeList from "./useRealtimeList";
 
 export default function AdminPage() {
+  const adminDisplayName = "Hamsafar Admin";
   const navigate = useNavigate();
 
   // ========== UI STATE ==========
@@ -37,7 +38,7 @@ export default function AdminPage() {
 
   // ========== PROFILE ==========
   const [adminProfile, setAdminProfile] = useState({
-    fullName: "Hamsafar Admin",
+    fullName: adminDisplayName,
     email: "",
     role: "",
     status: "",
@@ -185,7 +186,7 @@ export default function AdminPage() {
         }
 
         setAdminProfile({
-          fullName: data.fullName || "Hamsafar Admin",
+          fullName: data.fullName || adminDisplayName,
           email: data.email || user.email || "",
           role: data.role || "",
           status: data.status || "",
@@ -794,7 +795,7 @@ export default function AdminPage() {
               <UserRound size={18} />
             </div>
             <div className="ap-user-text">
-              <div className="ap-user-name">{adminProfile.fullName}</div>
+              <div className="ap-user-name">{adminDisplayName}</div>
               <div className="ap-user-role">Admin</div>
               {adminProfile.email ? (
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{adminProfile.email}</div>
@@ -872,9 +873,9 @@ export default function AdminPage() {
                 onClick={() => setShowProfileMenu((p) => !p)}
               >
                 <div className="ap-profile-avatar">
-                  {adminProfile.fullName?.[0] || "A"}
+                  {adminDisplayName[0] || "A"}
                 </div>
-                <span className="ap-profile-name">{adminProfile.fullName}</span>
+                <span className="ap-profile-name">{adminDisplayName}</span>
               </button>
               {showProfileMenu && (
                 <div
