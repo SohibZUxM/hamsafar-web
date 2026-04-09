@@ -107,6 +107,11 @@ const normalizeAttendanceStatus = (status) => {
   return "Recorded";
 };
 
+const getInitialLetter = (value, fallback = "?") => {
+  const clean = String(value || "").trim();
+  return clean ? clean.charAt(0).toUpperCase() : fallback;
+};
+
 export default function ParentPage() {
   const navigate = useNavigate();
   const [authReady, setAuthReady] = useState(false);
@@ -315,7 +320,7 @@ export default function ParentPage() {
         return {
           id: student.id,
           name: student.fullName || student.email || "Student",
-          avatar: `https://i.pravatar.cc/120?u=${student.id}`,
+          initial: getInitialLetter(student.fullName || student.email, "S"),
           gradeLevel: primaryClass?.courseName || "Student",
           classroom: primaryClass ? `Class: ${primaryClass.name}` : "No class assigned",
           teacher: primaryClass?.teacherName || "Teacher not assigned",
@@ -579,11 +584,9 @@ export default function ParentPage() {
 
         <div className="pp-sidebar-bottom">
           <div className="pp-sidebar-user">
-            <img
-              className="pp-sidebar-avatar"
-              src="https://i.pravatar.cc/100?img=47"
-              alt={parentProfile.fullName}
-            />
+            <div className="pp-sidebar-avatar" aria-hidden="true">
+              {getInitialLetter(parentProfile.fullName, "P")}
+            </div>
             <div className="pp-user-info">
               <div className="pp-sidebar-name">{parentProfile.fullName}</div>
               <div className="pp-sidebar-role">Parent</div>
@@ -657,7 +660,7 @@ export default function ParentPage() {
                 className="pp-profile-btn"
                 onClick={() => setShowProfileMenu((prev) => !prev)}
               >
-                <div className="pp-profile-avatar">{parentProfile.fullName?.[0] || "P"}</div>
+                <div className="pp-profile-avatar">{getInitialLetter(parentProfile.fullName, "P")}</div>
                 <div className="pp-profile-text">
                   <div className="pp-profile-name">{parentProfile.fullName}</div>
                   {parentProfile.email ? <div className="pp-profile-email">{parentProfile.email}</div> : null}
@@ -769,7 +772,9 @@ export default function ParentPage() {
                       >
                         <div className="pp-child-top">
                           <div className="pp-child-left">
-                            <img src={child.avatar} alt={child.name} className="pp-child-avatar" />
+                            <div className="pp-child-avatar" aria-hidden="true">
+                              {child.initial}
+                            </div>
                             <div>
                               <h4 className="pp-child-name">{child.name}</h4>
                               <p className="pp-child-sub">
@@ -896,7 +901,9 @@ export default function ParentPage() {
                     >
                       <div className="pp-child-top">
                         <div className="pp-child-left">
-                          <img src={child.avatar} alt={child.name} className="pp-child-avatar" />
+                          <div className="pp-child-avatar" aria-hidden="true">
+                            {child.initial}
+                          </div>
                           <div>
                             <h4 className="pp-child-name">{child.name}</h4>
                             <p className="pp-child-sub">

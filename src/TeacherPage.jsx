@@ -22,6 +22,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -29,6 +30,7 @@ import {
   query,
   setDoc,
   serverTimestamp,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
@@ -42,15 +44,26 @@ import {
 } from "firebase/storage";
 
 /* ===================== ResourceModal ===================== */
-function ResourceModal({ myClasses, selectedClassId, onSubmit, onClose }) {
+function ResourceModal({
+  myClasses,
+  selectedClassId,
+  initialValues = null,
+  submitLabel = "Save Resource",
+  onSubmit,
+  onClose,
+}) {
   const uploadTimeoutMs = 45000;
-  const [resType, setResType] = useState("link"); // "link" | "file"
-  const [classId, setClassId] = useState(selectedClassId || "");
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [description, setDescription] = useState("");
-  const [fileUrl, setFileUrl] = useState("");
-  const [fileName, setFileName] = useState("");
+  const [resType, setResType] = useState(initialValues?.resourceType || "link"); // "link" | "file"
+  const [classId, setClassId] = useState(initialValues?.classId || selectedClassId || "");
+  const [title, setTitle] = useState(initialValues?.title || "");
+  const [url, setUrl] = useState(
+    initialValues?.resourceType === "link" ? initialValues?.url || "" : ""
+  );
+  const [description, setDescription] = useState(initialValues?.description || "");
+  const [fileUrl, setFileUrl] = useState(
+    initialValues?.resourceType === "file" ? initialValues?.url || "" : ""
+  );
+  const [fileName, setFileName] = useState(initialValues?.fileName || "");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -58,8 +71,19 @@ function ResourceModal({ myClasses, selectedClassId, onSubmit, onClose }) {
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    setClassId(selectedClassId || "");
-  }, [selectedClassId]);
+    setResType(initialValues?.resourceType || "link");
+    setClassId(initialValues?.classId || selectedClassId || "");
+    setTitle(initialValues?.title || "");
+    setUrl(initialValues?.resourceType === "link" ? initialValues?.url || "" : "");
+    setDescription(initialValues?.description || "");
+    setFileUrl(initialValues?.resourceType === "file" ? initialValues?.url || "" : "");
+    setFileName(initialValues?.fileName || "");
+    setUploadProgress(0);
+    setUploading(false);
+    setSaving(false);
+    setUploadError("");
+    setFormError("");
+  }, [initialValues, selectedClassId]);
 
   const handleFileChange = async (e) => {
     const input = e.target;
@@ -315,7 +339,7 @@ function ResourceModal({ myClasses, selectedClassId, onSubmit, onClose }) {
           )}
           {fileUrl && !uploading && (
             <div style={{ fontSize: 12, color: "#16a34a", marginTop: 4 }}>
-              ✅ {fileName ? `${fileName} uploaded successfully` : "File uploaded successfully"}
+              ✅ {fileName ? `${fileName} ready` : "File ready"}
             </div>
           )}
           {uploadError && (
@@ -345,7 +369,7 @@ function ResourceModal({ myClasses, selectedClassId, onSubmit, onClose }) {
           type="submit"
           disabled={uploading || saving || (resType === "file" && !fileUrl)}
         >
-          {uploading ? "Uploading…" : saving ? "Saving..." : "Save Resource"}
+          {uploading ? "Uploading…" : saving ? "Saving..." : submitLabel}
         </button>
       </div>
     </form>
@@ -372,6 +396,22 @@ function getTimestampValue(value) {
   const dateValue = value?.toDate ? value.toDate() : new Date(value);
   const time = dateValue instanceof Date ? dateValue.getTime() : NaN;
   return Number.isNaN(time) ? 0 : time;
+}
+
+function formatDateInput(value) {
+  if (!value) return "";
+  const dateValue = value?.toDate ? value.toDate() : new Date(value);
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) return "";
+  return dateValue.toISOString().slice(0, 10);
+}
+
+function formatDateTimeLocalInput(value) {
+  if (!value) return "";
+  const dateValue = value?.toDate ? value.toDate() : new Date(value);
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) return "";
+  const offset = dateValue.getTimezoneOffset();
+  const localDate = new Date(dateValue.getTime() - offset * 60 * 1000);
+  return localDate.toISOString().slice(0, 16);
 }
 
 export default function TeacherPage() {
@@ -435,6 +475,11 @@ export default function TeacherPage() {
     date: new Date().toISOString().slice(0, 10),
     note: "",
   });
+  const [editingExam, setEditingExam] = useState(null);
+  const [editingGrade, setEditingGrade] = useState(null);
+  const [editingAttendance, setEditingAttendance] = useState(null);
+  const [editingSession, setEditingSession] = useState(null);
+  const [editingResource, setEditingResource] = useState(null);
 
   // ========== AUTH/UID STATE (FIX) ==========
   const [teacherUid, setTeacherUid] = useState(null);
@@ -606,7 +651,14 @@ export default function TeacherPage() {
   const dashboardRecentGrades = useMemo(() => recentGrades.slice(0, 4), [recentGrades]);
 
   // ========== HELPERS ==========
-  const closeModal = () => setModal(null);
+  const closeModal = () => {
+    setModal(null);
+    setEditingExam(null);
+    setEditingGrade(null);
+    setEditingAttendance(null);
+    setEditingSession(null);
+    setEditingResource(null);
+  };
 
   const getClassById = useCallback(
     (classId) => myClasses.find((c) => c.id === classId) || null,
@@ -755,7 +807,52 @@ export default function TeacherPage() {
     navigate("/");
   };
 
-  const handleAddExam = async (e) => {
+  const openExamModal = useCallback(
+    (exam = null) => {
+      if (exam?.classId) {
+        setSelectedClassId(exam.classId);
+      }
+      setEditingExam(exam);
+      setModal("exam");
+    },
+    [setSelectedClassId]
+  );
+
+  const openGradeModal = useCallback(
+    (grade = null, classId = null) => {
+      const nextClassId = classId || grade?.classId || selectedClassId || "";
+      if (nextClassId) {
+        setSelectedClassId(nextClassId);
+      }
+      setEditingGrade(grade);
+      setModal("grade");
+    },
+    [selectedClassId]
+  );
+
+  const openSessionModal = useCallback(
+    (session = null) => {
+      if (session?.classId) {
+        setSelectedClassId(session.classId);
+      }
+      setEditingSession(session);
+      setModal("schedule");
+    },
+    [setSelectedClassId]
+  );
+
+  const openResourceModal = useCallback(
+    (resource = null) => {
+      if (resource?.classId) {
+        setSelectedClassId(resource.classId);
+      }
+      setEditingResource(resource);
+      setModal("resource");
+    },
+    [setSelectedClassId]
+  );
+
+  const handleSaveExam = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
 
@@ -766,20 +863,33 @@ export default function TeacherPage() {
 
     if (!classId || !title) return;
 
-    await addDoc(collection(db, "exams"), {
+    const payload = {
       classId,
       title,
       date: dateStr ? new Date(dateStr) : null,
       maxScore: Number.isFinite(maxScore) ? maxScore : 100,
       teacherUid: teacherUid || null,
-      createdAt: serverTimestamp(),
-    });
+      updatedAt: serverTimestamp(),
+    };
+
+    if (editingExam?.id) {
+      await updateDoc(doc(db, "exams", editingExam.id), payload);
+    } else {
+      await addDoc(collection(db, "exams"), {
+        ...payload,
+        createdAt: serverTimestamp(),
+      });
+    }
 
     closeModal();
   };
 
-  // ✅ exam optional
-  const handleAddGrade = async (e) => {
+  const handleDeleteExam = async (examId) => {
+    if (!examId || !window.confirm("Remove this exam?")) return;
+    await deleteDoc(doc(db, "exams", examId));
+  };
+
+  const handleSaveGrade = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
 
@@ -803,7 +913,7 @@ export default function TeacherPage() {
       ? maxScoreTyped
       : (ex?.maxScore ?? 100);
 
-    await addDoc(collection(db, "grades"), {
+    const payload = {
       classId,
       studentUid,
       examId: examIdRaw || null,
@@ -812,13 +922,27 @@ export default function TeacherPage() {
       score,
       maxScore: finalMaxScore,
       teacherUid: teacherUid || null,
-      createdAt: serverTimestamp(),
-    });
+      updatedAt: serverTimestamp(),
+    };
+
+    if (editingGrade?.id) {
+      await updateDoc(doc(db, "grades", editingGrade.id), payload);
+    } else {
+      await addDoc(collection(db, "grades"), {
+        ...payload,
+        createdAt: serverTimestamp(),
+      });
+    }
 
     closeModal();
   };
 
-  const handleAddResource = async ({
+  const handleDeleteGrade = async (gradeId) => {
+    if (!gradeId || !window.confirm("Remove this grade record?")) return;
+    await deleteDoc(doc(db, "grades", gradeId));
+  };
+
+  const handleSaveResource = async ({
     classId,
     title,
     url,
@@ -835,7 +959,7 @@ export default function TeacherPage() {
       throw new Error("Missing required resource details.");
     }
 
-    await addDoc(collection(db, "resources"), {
+    const payload = {
       classId: cleanClassId,
       title: cleanTitle,
       url: cleanUrl,
@@ -843,13 +967,27 @@ export default function TeacherPage() {
       resourceType: resourceType || "link",
       fileName: fileName || null,
       teacherUid: teacherUid || null,
-      createdAt: serverTimestamp(),
-    });
+      updatedAt: serverTimestamp(),
+    };
+
+    if (editingResource?.id) {
+      await updateDoc(doc(db, "resources", editingResource.id), payload);
+    } else {
+      await addDoc(collection(db, "resources"), {
+        ...payload,
+        createdAt: serverTimestamp(),
+      });
+    }
 
     closeModal();
   };
 
-  const handleAddAttendance = async (e) => {
+  const handleDeleteResource = async (resourceId) => {
+    if (!resourceId || !window.confirm("Remove this resource?")) return;
+    await deleteDoc(doc(db, "resources", resourceId));
+  };
+
+  const handleSaveAttendance = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
 
@@ -860,27 +998,33 @@ export default function TeacherPage() {
     const note = String(fd.get("note") || "").trim();
 
     if (!classId || !studentUid || !dateStr) return;
-
     const attendanceDocId = `${classId}_${studentUid}_${dateStr}`;
-    await setDoc(
-      doc(db, "attendance", attendanceDocId),
-      {
-        classId,
-        studentUid,
-        status,
-        date: new Date(`${dateStr}T00:00:00`),
-        note: note || null,
-        teacherUid: teacherUid || null,
-        updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    const payload = {
+      classId,
+      studentUid,
+      status,
+      date: new Date(`${dateStr}T00:00:00`),
+      note: note || null,
+      teacherUid: teacherUid || null,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    };
+
+    if (editingAttendance?.id && editingAttendance.id !== attendanceDocId) {
+      await deleteDoc(doc(db, "attendance", editingAttendance.id));
+    }
+
+    await setDoc(doc(db, "attendance", attendanceDocId), payload, { merge: true });
 
     closeModal();
   };
 
-  const handleScheduleClass = async (e) => {
+  const handleDeleteAttendance = async (attendanceId) => {
+    if (!attendanceId || !window.confirm("Remove this attendance record?")) return;
+    await deleteDoc(doc(db, "attendance", attendanceId));
+  };
+
+  const handleSaveSession = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
 
@@ -895,17 +1039,31 @@ export default function TeacherPage() {
     const startsAt = new Date(startsAtStr);
     const endsAt = endsAtStr ? new Date(endsAtStr) : null;
 
-    await addDoc(collection(db, "classSessions"), {
+    const payload = {
       classId,
       startsAt,
       endsAt,
       location: location || null,
       note: note || null,
       teacherUid: teacherUid || null,
-      createdAt: serverTimestamp(),
-    });
+      updatedAt: serverTimestamp(),
+    };
+
+    if (editingSession?.id) {
+      await updateDoc(doc(db, "classSessions", editingSession.id), payload);
+    } else {
+      await addDoc(collection(db, "classSessions"), {
+        ...payload,
+        createdAt: serverTimestamp(),
+      });
+    }
 
     closeModal();
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    if (!sessionId || !window.confirm("Remove this scheduled class?")) return;
+    await deleteDoc(doc(db, "classSessions", sessionId));
   };
 
   const myAttendanceRaw = useRealtimeWhereIn(
@@ -937,15 +1095,21 @@ export default function TeacherPage() {
     return map;
   }, [myAttendance, selectedClassId]);
 
-  const openAttendanceModal = (studentUid = "", classId = selectedClassId || myClasses[0]?.id || "") => {
-    if (classId) setSelectedClassId(classId);
+  const openAttendanceModal = (
+    studentUid = "",
+    classId = selectedClassId || myClasses[0]?.id || "",
+    attendance = null
+  ) => {
+    const nextClassId = attendance?.classId || classId;
+    if (nextClassId) setSelectedClassId(nextClassId);
     setAttendanceDraft({
-      classId,
-      studentUid,
-      status: "present",
-      date: new Date().toISOString().slice(0, 10),
-      note: "",
+      classId: nextClassId,
+      studentUid: attendance?.studentUid || studentUid,
+      status: attendance?.status || "present",
+      date: attendance ? formatDateInput(attendance.date || attendance.createdAt) : new Date().toISOString().slice(0, 10),
+      note: attendance?.note || "",
     });
+    setEditingAttendance(attendance);
     setModal("attendance");
   };
 
@@ -1419,7 +1583,7 @@ export default function TeacherPage() {
                     <button
                       className="tp-cta tp-cta-small"
                       type="button"
-                      onClick={() => setModal("grade")}
+                      onClick={() => openGradeModal(null, selectedClassId)}
                       disabled={!selectedClassId}
                       title={!selectedClassId ? "Select a class first" : ""}
                     >
@@ -1428,7 +1592,7 @@ export default function TeacherPage() {
                     <button
                       className="tp-cta tp-cta-small"
                       type="button"
-                      onClick={() => setModal("exam")}
+                      onClick={() => openExamModal()}
                       disabled={!selectedClassId}
                     >
                       📝 Add Exam
@@ -1461,7 +1625,7 @@ export default function TeacherPage() {
             <section className="tp-card">
               <div className="tp-card-header">
                 <h3>Exams</h3>
-                <button className="tp-cta tp-cta-small" type="button" onClick={() => setModal("exam")}>
+                <button className="tp-cta tp-cta-small" type="button" onClick={() => openExamModal()}>
                   + New Exam
                 </button>
               </div>
@@ -1472,12 +1636,24 @@ export default function TeacherPage() {
                 <ul className="tp-announce-list" style={{ marginTop: 10 }}>
                   {myExams.map((ex) => (
                     <li key={ex.id} className="tp-announce-item tp-announce-yellow">
-                      <p className="tp-announce-title">{ex.title}</p>
-                      <p className="tp-announce-text">
-                        Class: {getClassLabel(ex.classId)} • Max: {ex.maxScore} • Date:{" "}
-                        {ex.date ? safeDateLabel(ex.date) : "—"}
-                      </p>
-                      <span className="tp-announce-time">{safeDateLabel(ex.createdAt)}</span>
+                      <div className="tp-record-row">
+                        <div className="tp-record-main">
+                          <p className="tp-announce-title">{ex.title}</p>
+                          <p className="tp-announce-text">
+                            Class: {getClassLabel(ex.classId)} • Max: {ex.maxScore} • Date:{" "}
+                            {ex.date ? safeDateLabel(ex.date) : "—"}
+                          </p>
+                          <span className="tp-announce-time">{safeDateLabel(ex.createdAt)}</span>
+                        </div>
+                        <div className="tp-record-actions">
+                          <button className="tp-modal-btn ghost" type="button" onClick={() => openExamModal(ex)}>
+                            Edit
+                          </button>
+                          <button className="tp-modal-btn tp-modal-btn-danger" type="button" onClick={() => handleDeleteExam(ex.id)}>
+                            Remove
+                          </button>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -1540,7 +1716,7 @@ export default function TeacherPage() {
                   <button
                     className="tp-cta tp-cta-small"
                     type="button"
-                    onClick={() => setModal("grade")}
+                    onClick={() => openGradeModal(null, selectedClassId)}
                     disabled={!selectedClassId}
                     title={!selectedClassId ? "Select a class first" : ""}
                   >
@@ -1558,14 +1734,26 @@ export default function TeacherPage() {
                   <ul className="tp-announce-list" style={{ marginTop: 10 }}>
                     {selectedClassGrades.map((g) => (
                       <li key={g.id} className="tp-announce-item tp-announce-blue">
-                        <p className="tp-announce-title">
-                          {(g.examId ? getExamLabel(g.examId) : (g.label || "Grade"))} •{" "}
-                          {getStudentLabel(g.studentUid)}
-                        </p>
-                        <p className="tp-announce-text">
-                          Class: {getClassLabel(g.classId)} • Score: {g.score}/{g.maxScore}
-                        </p>
-                        <span className="tp-announce-time">{safeDateLabel(g.date || g.createdAt)}</span>
+                        <div className="tp-record-row">
+                          <div className="tp-record-main">
+                            <p className="tp-announce-title">
+                              {(g.examId ? getExamLabel(g.examId) : (g.label || "Grade"))} •{" "}
+                              {getStudentLabel(g.studentUid)}
+                            </p>
+                            <p className="tp-announce-text">
+                              Class: {getClassLabel(g.classId)} • Score: {g.score}/{g.maxScore}
+                            </p>
+                            <span className="tp-announce-time">{safeDateLabel(g.date || g.createdAt)}</span>
+                          </div>
+                          <div className="tp-record-actions">
+                            <button className="tp-modal-btn ghost" type="button" onClick={() => openGradeModal(g)}>
+                              Edit
+                            </button>
+                            <button className="tp-modal-btn tp-modal-btn-danger" type="button" onClick={() => handleDeleteGrade(g.id)}>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -1663,10 +1851,19 @@ export default function TeacherPage() {
                             <button
                               className="tp-cta tp-cta-small"
                               type="button"
-                              onClick={() => openAttendanceModal(student.id, selectedClassId)}
+                              onClick={() => openAttendanceModal(student.id, selectedClassId, latest)}
                             >
-                              {latest ? "Update" : "Mark"}
+                              {latest ? "Edit" : "Mark"}
                             </button>
+                            {latest ? (
+                              <button
+                                className="tp-modal-btn tp-modal-btn-danger"
+                                type="button"
+                                onClick={() => handleDeleteAttendance(latest.id)}
+                              >
+                                Remove
+                              </button>
+                            ) : null}
                           </div>
                         </li>
                       );
@@ -1714,7 +1911,7 @@ export default function TeacherPage() {
             <section className="tp-card">
               <div className="tp-card-header">
                 <h3>Schedule</h3>
-                <button className="tp-cta tp-cta-small" type="button" onClick={() => setModal("schedule")}>
+                <button className="tp-cta tp-cta-small" type="button" onClick={() => openSessionModal()}>
                   + Schedule Class
                 </button>
               </div>
@@ -1729,17 +1926,29 @@ export default function TeacherPage() {
                     const cls = getClassById(s.classId);
                     return (
                       <li key={s.id} className="tp-announce-item tp-announce-yellow">
-                        <p className="tp-announce-title">
-                          {cls?.name || cls?.code || "Class"} •{" "}
-                          {s.location || "No location set"}
-                        </p>
-                        <p className="tp-announce-text">
-                          Starts: {safeDateLabel(s.startsAt)}{" "}
-                          {s.endsAt ? `• Ends: ${safeDateLabel(s.endsAt)}` : ""}
-                        </p>
-                        {s.note ? (
-                          <span className="tp-announce-time">{s.note}</span>
-                        ) : null}
+                        <div className="tp-record-row">
+                          <div className="tp-record-main">
+                            <p className="tp-announce-title">
+                              {cls?.name || cls?.code || "Class"} •{" "}
+                              {s.location || "No location set"}
+                            </p>
+                            <p className="tp-announce-text">
+                              Starts: {safeDateLabel(s.startsAt)}{" "}
+                              {s.endsAt ? `• Ends: ${safeDateLabel(s.endsAt)}` : ""}
+                            </p>
+                            {s.note ? (
+                              <span className="tp-announce-time">{s.note}</span>
+                            ) : null}
+                          </div>
+                          <div className="tp-record-actions">
+                            <button className="tp-modal-btn ghost" type="button" onClick={() => openSessionModal(s)}>
+                              Edit
+                            </button>
+                            <button className="tp-modal-btn tp-modal-btn-danger" type="button" onClick={() => handleDeleteSession(s.id)}>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
                       </li>
                     );
                   })}
@@ -1823,7 +2032,7 @@ export default function TeacherPage() {
             <section className="tp-card">
               <div className="tp-card-header">
                 <h3>Resources</h3>
-                <button className="tp-cta tp-cta-small" type="button" onClick={() => setModal("resource")}>
+                <button className="tp-cta tp-cta-small" type="button" onClick={() => openResourceModal()}>
                   + Add Resource
                 </button>
               </div>
@@ -1834,20 +2043,32 @@ export default function TeacherPage() {
                 <ul className="tp-announce-list" style={{ marginTop: 10 }}>
                   {myResources.map((r) => (
                     <li key={r.id} className="tp-announce-item tp-announce-blue">
-                      <p className="tp-announce-title">{r.title}</p>
-                      <p className="tp-announce-text">
-                        Class: {getClassLabel(r.classId)}
-                        {r.description ? ` • ${r.description}` : ""}
-                      </p>
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="tp-announce-time"
-                        style={{ textDecoration: "underline", color: "#2563eb" }}
-                      >
-                        {r.url}
-                      </a>
+                      <div className="tp-record-row">
+                        <div className="tp-record-main">
+                          <p className="tp-announce-title">{r.title}</p>
+                          <p className="tp-announce-text">
+                            Class: {getClassLabel(r.classId)}
+                            {r.description ? ` • ${r.description}` : ""}
+                          </p>
+                          <a
+                            href={r.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="tp-announce-time"
+                            style={{ textDecoration: "underline", color: "#2563eb" }}
+                          >
+                            {r.url}
+                          </a>
+                        </div>
+                        <div className="tp-record-actions">
+                          <button className="tp-modal-btn ghost" type="button" onClick={() => openResourceModal(r)}>
+                            Edit
+                          </button>
+                          <button className="tp-modal-btn tp-modal-btn-danger" type="button" onClick={() => handleDeleteResource(r.id)}>
+                            Remove
+                          </button>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -1866,11 +2087,11 @@ export default function TeacherPage() {
             <div className="tp-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
               <div className="tp-modal-head">
                 <div className="tp-modal-title">
-                  {modal === "exam" && "Add Exam"}
-                  {modal === "grade" && "Grade Student"}
-                  {modal === "attendance" && "Mark Attendance"}
-                  {modal === "schedule" && "Schedule Class"}
-                  {modal === "resource" && "Add Resource"}
+                  {modal === "exam" && (editingExam ? "Edit Exam" : "Add Exam")}
+                  {modal === "grade" && (editingGrade ? "Edit Grade" : "Grade Student")}
+                  {modal === "attendance" && (editingAttendance ? "Edit Attendance" : "Mark Attendance")}
+                  {modal === "schedule" && (editingSession ? "Edit Scheduled Class" : "Schedule Class")}
+                  {modal === "resource" && (editingResource ? "Edit Resource" : "Add Resource")}
                 </div>
 
                 <button className="tp-modal-x" type="button" onClick={closeModal}>
@@ -1880,9 +2101,14 @@ export default function TeacherPage() {
 
               {/* Add Exam */}
               {modal === "exam" && (
-                <form className="tp-modal-form" onSubmit={handleAddExam}>
-                  <label>Class</label>
-                  <select name="classId" required defaultValue={selectedClassId || ""}>
+                <form className="tp-modal-form" onSubmit={handleSaveExam}>
+                  <label htmlFor="teacher-exam-class">Class</label>
+                  <select
+                    id="teacher-exam-class"
+                    name="classId"
+                    required
+                    defaultValue={editingExam?.classId || selectedClassId || ""}
+                  >
                     <option value="">Select class...</option>
                     {myClasses.map((cl) => (
                       <option key={cl.id} value={cl.id}>
@@ -1891,21 +2117,38 @@ export default function TeacherPage() {
                     ))}
                   </select>
 
-                  <label>Exam Title</label>
-                  <input name="title" required placeholder="e.g. Midterm 1" />
+                  <label htmlFor="teacher-exam-title">Exam Title</label>
+                  <input
+                    id="teacher-exam-title"
+                    name="title"
+                    required
+                    placeholder="e.g. Midterm 1"
+                    defaultValue={editingExam?.title || ""}
+                  />
 
-                  <label>Exam Date (optional)</label>
-                  <input name="date" type="date" />
+                  <label htmlFor="teacher-exam-date">Exam Date (optional)</label>
+                  <input
+                    id="teacher-exam-date"
+                    name="date"
+                    type="date"
+                    defaultValue={formatDateInput(editingExam?.date)}
+                  />
 
-                  <label>Max Score</label>
-                  <input name="maxScore" type="number" placeholder="100" defaultValue={100} />
+                  <label htmlFor="teacher-exam-max">Max Score</label>
+                  <input
+                    id="teacher-exam-max"
+                    name="maxScore"
+                    type="number"
+                    placeholder="100"
+                    defaultValue={editingExam?.maxScore ?? 100}
+                  />
 
                   <div className="tp-modal-actions">
                     <button type="button" className="tp-modal-btn ghost" onClick={closeModal}>
                       Cancel
                     </button>
                     <button className="tp-modal-btn" type="submit">
-                      Save
+                      {editingExam ? "Save Changes" : "Save"}
                     </button>
                   </div>
                 </form>
@@ -1913,9 +2156,10 @@ export default function TeacherPage() {
 
               {/* Grade Student */}
               {modal === "grade" && (
-                <form className="tp-modal-form" onSubmit={handleAddGrade}>
-                  <label>Class</label>
+                <form className="tp-modal-form" onSubmit={handleSaveGrade}>
+                  <label htmlFor="teacher-grade-class">Class</label>
                   <select
+                    id="teacher-grade-class"
                     name="classId"
                     required
                     value={selectedClassId || ""}
@@ -1931,8 +2175,14 @@ export default function TeacherPage() {
 
                   <div className="tp-field-row">
                     <div>
-                      <label>Student</label>
-                      <select name="studentUid" required disabled={!selectedClassId}>
+                      <label htmlFor="teacher-grade-student">Student</label>
+                      <select
+                        id="teacher-grade-student"
+                        name="studentUid"
+                        required
+                        disabled={!selectedClassId}
+                        defaultValue={editingGrade?.studentUid || ""}
+                      >
                         <option value="">Select student...</option>
                         {selectedClassStudents.map((s) => (
                           <option key={s.id} value={s.id}>
@@ -1943,8 +2193,13 @@ export default function TeacherPage() {
                     </div>
 
                     <div>
-                      <label>Exam (optional)</label>
-                      <select name="examId" disabled={!selectedClassId}>
+                      <label htmlFor="teacher-grade-exam">Exam (optional)</label>
+                      <select
+                        id="teacher-grade-exam"
+                        name="examId"
+                        disabled={!selectedClassId}
+                        defaultValue={editingGrade?.examId || ""}
+                      >
                         <option value="">No exam</option>
                         {examsForSelectedClass.map((ex) => (
                           <option key={ex.id} value={ex.id}>
@@ -1957,27 +2212,54 @@ export default function TeacherPage() {
 
                   <div className="tp-field-row">
                     <div>
-                      <label>Score</label>
-                      <input name="score" type="number" required placeholder="e.g. 87" />
+                      <label htmlFor="teacher-grade-score">Score</label>
+                      <input
+                        id="teacher-grade-score"
+                        name="score"
+                        type="number"
+                        required
+                        placeholder="e.g. 87"
+                        defaultValue={editingGrade?.score ?? ""}
+                      />
                     </div>
                     <div>
-                      <label>Max Score (optional)</label>
-                      <input name="maxScore" type="number" placeholder="100" />
+                      <label htmlFor="teacher-grade-max">Max Score (optional)</label>
+                      <input
+                        id="teacher-grade-max"
+                        name="maxScore"
+                        type="number"
+                        placeholder="100"
+                        defaultValue={editingGrade?.maxScore ?? ""}
+                      />
                     </div>
                   </div>
 
-                  <label>Grade Date</label>
-                  <input name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} />
+                  <label htmlFor="teacher-grade-date">Grade Date</label>
+                  <input
+                    id="teacher-grade-date"
+                    name="date"
+                    type="date"
+                    defaultValue={
+                      editingGrade
+                        ? formatDateInput(editingGrade.date || editingGrade.createdAt)
+                        : new Date().toISOString().slice(0, 10)
+                    }
+                  />
 
-                  <label>Label / Note (optional)</label>
-                  <input name="label" placeholder="e.g. Quiz 2, Homework 1, Participation..." />
+                  <label htmlFor="teacher-grade-label">Label / Note (optional)</label>
+                  <input
+                    id="teacher-grade-label"
+                    name="label"
+                    placeholder="e.g. Quiz 2, Homework 1, Participation..."
+                    defaultValue={editingGrade?.label || ""}
+                  />
 
                   <div className="tp-modal-actions">
                     <button type="button" className="tp-modal-btn ghost" onClick={closeModal}>
                       Cancel
                     </button>
                     <button className="tp-modal-btn" type="submit">
-                      Save Grade
+                      {editingGrade ? "Save Grade" : "Save Grade"}
                     </button>
                   </div>
 
@@ -1987,9 +2269,10 @@ export default function TeacherPage() {
 
               {/* Mark Attendance */}
               {modal === "attendance" && (
-                <form className="tp-modal-form" onSubmit={handleAddAttendance}>
-                  <label>Class</label>
+                <form className="tp-modal-form" onSubmit={handleSaveAttendance}>
+                  <label htmlFor="teacher-attendance-class">Class</label>
                   <select
+                    id="teacher-attendance-class"
                     name="classId"
                     required
                     value={attendanceDraft.classId}
@@ -2013,8 +2296,9 @@ export default function TeacherPage() {
 
                   <div className="tp-field-row">
                     <div>
-                      <label>Student</label>
+                      <label htmlFor="teacher-attendance-student">Student</label>
                       <select
+                        id="teacher-attendance-student"
                         name="studentUid"
                         required
                         value={attendanceDraft.studentUid}
@@ -2033,8 +2317,9 @@ export default function TeacherPage() {
                     </div>
 
                     <div>
-                      <label>Status</label>
+                      <label htmlFor="teacher-attendance-status">Status</label>
                       <select
+                        id="teacher-attendance-status"
                         name="status"
                         value={attendanceDraft.status}
                         onChange={(e) =>
@@ -2051,8 +2336,9 @@ export default function TeacherPage() {
 
                   <div className="tp-field-row">
                     <div>
-                      <label>Date</label>
+                      <label htmlFor="teacher-attendance-date">Date</label>
                       <input
+                        id="teacher-attendance-date"
                         name="date"
                         type="date"
                         required
@@ -2064,8 +2350,9 @@ export default function TeacherPage() {
                     </div>
 
                     <div>
-                      <label>Note (optional)</label>
+                      <label htmlFor="teacher-attendance-note">Note (optional)</label>
                       <input
+                        id="teacher-attendance-note"
                         name="note"
                         placeholder="Short note about attendance..."
                         value={attendanceDraft.note}
@@ -2081,7 +2368,7 @@ export default function TeacherPage() {
                       Cancel
                     </button>
                     <button className="tp-modal-btn" type="submit">
-                      Save Attendance
+                      {editingAttendance ? "Save Attendance" : "Save Attendance"}
                     </button>
                   </div>
 
@@ -2099,7 +2386,9 @@ export default function TeacherPage() {
                   <ResourceModal
                     myClasses={myClasses}
                     selectedClassId={selectedClassId}
-                    onSubmit={handleAddResource}
+                    initialValues={editingResource}
+                    submitLabel={editingResource ? "Save Resource" : "Save Resource"}
+                    onSubmit={handleSaveResource}
                     onClose={closeModal}
                   />
                 );
@@ -2107,9 +2396,14 @@ export default function TeacherPage() {
 
               {/* Schedule Class */}
               {modal === "schedule" && (
-                <form className="tp-modal-form" onSubmit={handleScheduleClass}>
-                  <label>Class</label>
-                  <select name="classId" required defaultValue={selectedClassId || ""}>
+                <form className="tp-modal-form" onSubmit={handleSaveSession}>
+                  <label htmlFor="teacher-session-class">Class</label>
+                  <select
+                    id="teacher-session-class"
+                    name="classId"
+                    required
+                    defaultValue={editingSession?.classId || selectedClassId || ""}
+                  >
                     <option value="">Select class...</option>
                     {myClasses.map((cl) => (
                       <option key={cl.id} value={cl.id}>
@@ -2118,24 +2412,45 @@ export default function TeacherPage() {
                     ))}
                   </select>
 
-                  <label>Start (date & time)</label>
-                  <input name="startsAt" type="datetime-local" required />
+                  <label htmlFor="teacher-session-start">Start (date & time)</label>
+                  <input
+                    id="teacher-session-start"
+                    name="startsAt"
+                    type="datetime-local"
+                    required
+                    defaultValue={formatDateTimeLocalInput(editingSession?.startsAt)}
+                  />
 
-                  <label>End (optional)</label>
-                  <input name="endsAt" type="datetime-local" />
+                  <label htmlFor="teacher-session-end">End (optional)</label>
+                  <input
+                    id="teacher-session-end"
+                    name="endsAt"
+                    type="datetime-local"
+                    defaultValue={formatDateTimeLocalInput(editingSession?.endsAt)}
+                  />
 
-                  <label>Location (optional)</label>
-                  <input name="location" placeholder="Room 204 / Zoom link / etc." />
+                  <label htmlFor="teacher-session-location">Location (optional)</label>
+                  <input
+                    id="teacher-session-location"
+                    name="location"
+                    placeholder="Room 204 / Zoom link / etc."
+                    defaultValue={editingSession?.location || ""}
+                  />
 
-                  <label>Note (optional)</label>
-                  <input name="note" placeholder="Anything to remember..." />
+                  <label htmlFor="teacher-session-note">Note (optional)</label>
+                  <input
+                    id="teacher-session-note"
+                    name="note"
+                    placeholder="Anything to remember..."
+                    defaultValue={editingSession?.note || ""}
+                  />
 
                   <div className="tp-modal-actions">
                     <button type="button" className="tp-modal-btn ghost" onClick={closeModal}>
                       Cancel
                     </button>
                     <button className="tp-modal-btn" type="submit">
-                      Schedule
+                      {editingSession ? "Save Schedule" : "Schedule"}
                     </button>
                   </div>
                 </form>

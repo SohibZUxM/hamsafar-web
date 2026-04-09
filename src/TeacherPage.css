@@ -617,6 +617,25 @@ body,
   color: #6b7280;
 }
 
+.tp-record-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.tp-record-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tp-record-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 /* =======================================
    QUICK ACTIONS
 ======================================= */
@@ -989,6 +1008,15 @@ body,
   background: #f3f4f6;
 }
 
+.tp-modal-btn-danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.tp-modal-btn-danger:hover {
+  background: #b91c1c;
+}
+
 .tp-modal-hint {
   grid-column: span 2;
   margin-top: -2px;
@@ -1004,6 +1032,14 @@ body,
 }
 
 @media (max-width: 640px) {
+  .tp-record-row {
+    flex-direction: column;
+  }
+
+  .tp-record-actions {
+    width: 100%;
+  }
+
   .tp-modal-form {
     grid-template-columns: 1fr;
   }
