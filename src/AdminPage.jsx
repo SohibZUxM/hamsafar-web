@@ -37,7 +37,7 @@ export default function AdminPage() {
 
   // ========== PROFILE ==========
   const [adminProfile, setAdminProfile] = useState({
-    fullName: "Admin",
+    fullName: "Hamsafar Admin",
     email: "",
     role: "",
     status: "",
@@ -185,7 +185,7 @@ export default function AdminPage() {
         }
 
         setAdminProfile({
-          fullName: data.fullName || "Admin",
+          fullName: data.fullName || "Hamsafar Admin",
           email: data.email || user.email || "",
           role: data.role || "",
           status: data.status || "",
